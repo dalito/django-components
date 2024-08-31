@@ -2,11 +2,14 @@
 name: Docs - build & deploy
 on:
   push:
-    branches: [master]
+    branches: 
+      - master
+    tags:
+      - '[0-9].[0-9]+'
   workflow_dispatch:
     inputs:
-      ref:
-        description: "The commit SHA, tag, or branch to publish. Uses the default branch if not specified."
+      docs_tag:
+        description: "The tag to publish docs for. Uses the default branch if not specified."
         default: ""
         type: string
   release:
@@ -20,11 +23,18 @@ jobs:
       pages: write     # to deploy to Pages
       id-token: write  # to verify the deployment originates from an appropriate source
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.repository_owner == 'EmilStenstrom'
+    # Only run in original repo (not in forks)
+    # XXX if: github.repository == 'EmilStenstrom/django-components'
     steps:
-      - uses: actions/checkout@v4
+      - name: Print input
+        run: 
+          echo "Input was ${{ github.event.inputs.docs_tag }}"
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use tag given in input for manually trigger workflows.
+          ref: ${{ github.event.inputs.docs_tag }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -39,34 +49,43 @@ jobs:
       - name: Create Virtual Environment
         run: hatch env create docs
 
-      - name: "Check for mkdocs build --strict"
+      - name: "Build and check docs in pull requests"
         # XXX Enable strict mode once docs are clean
         run: |
           hatch run docs:build
           # hatch run docs:build --strict
-        # If pull request or not master branch and not a tag
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
 
       - name: Configure git
         run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
+          # git config user.name github-actions
+          # git config user.email github-actions@github.com
+          # env vars used in this action
+          echo 'Skipping configuring git. It is not required.'
+
+      - name: Print variables possibly needed
+        # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#github-context
+        run: |
+          # env vars used in this action
+          echo 'event_name' ${{ github.event_name }}
+          echo 'ref_name' ${{ github.ref_name }}
+          echo 'ref_type' ${{ github.ref_type }}
+          echo 'event.action' ${{ github.event.action }}
 
       - name: Deploy docs (dev)
-        if: github.event_name == 'push' && github.ref_name == 'master' && github.ref_type == 'branch'
+        if: github.event_name == 'push' && github.ref_type != 'tag'
         run: |
           export SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          hatch run docs:mike deploy dev --update-aliases --title "dev (${SHORT_SHA})" --push --alias-type=redirect
+          hatch run docs:mike deploy dev --update-aliases --title "dev (${SHORT_SHA})" --push
 
-      - name: Deploy docs (tag)
+      - name: Deploy docs (new tag)
         if: github.ref_type == 'tag' && github.event_name == 'push'
         run: |
-          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases --alias-type=redirect
+          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases
           hatch run docs:mike set-default latest --push
 
-      - name: Deploy docs (Released published)
-        if: github.event_name == 'release' && github.event.action == 'published' && github.ref_type == 'tag'
+      - name: Deploy docs (new release published)
+        # github.ref contains the release name created for a Release; github.ref_name should be the short tag
+        if: github.event_name == 'release'
         run: |
-          # Version from tag, keep leading v, from github.ref workflow variable
-          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases --alias-type=redirect
+          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases
           hatch run docs:mike set-default latest --push
