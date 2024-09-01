@@ -57,10 +57,8 @@ jobs:
 
       - name: Configure git
         run: |
-          # git config user.name github-actions
-          # git config user.email github-actions@github.com
-          # env vars used in this action
-          echo 'Skipping configuring git. It is not required.'
+          git config user.name github-actions
+          git config user.email github-actions@github.com
 
       - name: Print variables possibly needed
         # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#github-context
