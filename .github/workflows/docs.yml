@@ -6,6 +6,9 @@ on:
       - '[0-9]+.[0-9]+'
     branches: 
       - master
+  pull_request:
+      branches:
+      - main
   release:
     types: [published]
   workflow_dispatch:
@@ -42,12 +45,6 @@ jobs:
       - name: Create Virtual Environment
         run: hatch env create docs
 
-      - name: "Build and check docs in pull requests"
-        # XXX Enable strict mode once docs are clean
-        run: |
-          hatch run docs:build
-          # hatch run docs:build --strict
-
       - name: Configure git
         run: |
           git config user.name github-actions
@@ -66,23 +63,30 @@ jobs:
           echo 'repository  : ' ${{ github.repository }}
 
       # Conditions make sure to select the right step, depending on the job trigger.
-      # Only one of the steps below will run.
+      # Only one of the steps below will run. The others will be skipped.
 
-      - name: Deploy docs (dev)
+      - name: Check docs in pull requests with strict mode
+        if: github.event_name == 'pull_request'
+        run: |
+          # XXX Enable strict mode once docs are clean
+          echo "Strict check of docs disabled."
+          # hatch run docs:build --strict
+
+      - name: Build & deploy "dev" docs for a new commit to master
         if: github.event_name == 'push' && github.ref_type != 'tag'
         run: |
           export SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          hatch run docs:mike deploy dev --update-aliases --title "dev (${SHORT_SHA})" --push
+          hatch run docs:mike deploy --push --update-aliases --title "dev (${SHORT_SHA})" dev
 
-      - name: Deploy docs (new tag)
+      - name: Build & deploy docs for a new tag
         if: github.ref_type == 'tag' && github.event_name == 'push'
         run: |
-          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases
+          hatch run docs:mike deploy --push --update-aliases ${{ github.ref_name }} latest
           hatch run docs:mike set-default latest --push
 
-      - name: Deploy docs (new release published)
+      - name: Build & deploy docs for a new release
         # github.ref contains the release name created for a Release; github.ref_name should be the short tag
         if: github.event_name == 'release'
         run: |
-          hatch run docs:mike deploy ${{ github.ref_name }} latest --push --update-aliases
+          hatch run docs:mike deploy --push --update-aliases ${{ github.ref_name }} latest
           hatch run docs:mike set-default latest --push
