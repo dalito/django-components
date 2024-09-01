@@ -67,7 +67,8 @@ jobs:
           echo 'event_name' ${{ github.event_name }}
           echo 'ref_name' ${{ github.ref_name }}
           echo 'ref_type' ${{ github.ref_type }}
-          echo 'event.action' ${{ github.event.action }}
+          echo 'github.event.action' ${{ github.event.action }}
+          echo 'github.repository' ${{ github.repository }}
 
       - name: Deploy docs (dev)
         if: github.event_name == 'push' && github.ref_type != 'tag'
