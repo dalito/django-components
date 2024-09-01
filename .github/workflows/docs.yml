@@ -82,7 +82,7 @@ jobs:
         if: github.ref_type == 'tag' && github.event_name == 'push'
         run: |
           # XXX next line removes docs wrongly deployed under latest identifier; remove if once latest is used only as alias
-          hatch run docs:mike --push delete latest
+          hatch run docs:mike delete --push latest
           hatch run docs:mike deploy --push --update-aliases ${{ github.ref_name }} latest
           hatch run docs:mike set-default latest --push
 
@@ -91,6 +91,6 @@ jobs:
         if: github.event_name == 'release'
         run: |
           # XXX next line removes docs wrongly deployed under latest identifier; remove if once latest is used only as alias
-          hatch run docs:mike --push delete latest
+          hatch run docs:mike delete --push latest
           hatch run docs:mike deploy --push --update-aliases ${{ github.ref_name }} latest
           hatch run docs:mike set-default latest --push
